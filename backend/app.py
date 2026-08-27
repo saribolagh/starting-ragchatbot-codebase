@@ -13,7 +13,9 @@ from config import config
 from rag_system import RAGSystem
 
 # Initialize FastAPI app
-app = FastAPI(title="Course Materials RAG System", root_path="")
+# root_path lets docs/openapi URLs resolve correctly when served behind a
+# path-prefixing reverse proxy (e.g. a JupyterHub/VS Code port-forward proxy)
+app = FastAPI(title="Course Materials RAG System", root_path=os.getenv("API_ROOT_PATH", ""))
 
 # Add trusted host middleware for proxy
 app.add_middleware(
@@ -40,10 +42,15 @@ class QueryRequest(BaseModel):
     query: str
     session_id: Optional[str] = None
 
+class SourceItem(BaseModel):
+    """A single source reference, optionally linking to its video"""
+    text: str
+    link: Optional[str] = None
+
 class QueryResponse(BaseModel):
     """Response model for course queries"""
     answer: str
-    sources: List[str]
+    sources: List[SourceItem]
     session_id: str
 
 class CourseStats(BaseModel):
@@ -61,10 +68,10 @@ async def query_documents(request: QueryRequest):
         session_id = request.session_id
         if not session_id:
             session_id = rag_system.session_manager.create_session()
-        
+
         # Process query using RAG system
         answer, sources = rag_system.query(request.query, session_id)
-        
+
         return QueryResponse(
             answer=answer,
             sources=sources,
@@ -113,7 +120,7 @@ class DevStaticFiles(StaticFiles):
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
-    
-    
+
+
 # Serve static files for the frontend
 app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")

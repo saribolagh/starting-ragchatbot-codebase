@@ -1,5 +1,5 @@
 // API base URL - use relative path to work from any host
-const API_URL = '/api';
+const API_URL = 'api';
 
 // Global state
 let currentSessionId = null;
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton = document.getElementById('sendButton');
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
-    
+
     setupEventListeners();
     createNewSession();
     loadCourseStats();
@@ -28,8 +28,8 @@ function setupEventListeners() {
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
     });
-    
-    
+
+
     // Suggested questions
     document.querySelectorAll('.suggested-item').forEach(button => {
         button.addEventListener('click', (e) => {
@@ -74,7 +74,7 @@ async function sendMessage() {
         if (!response.ok) throw new Error('Query failed');
 
         const data = await response.json();
-        
+
         // Update session ID if new
         if (!currentSessionId) {
             currentSessionId = data.session_id;
@@ -115,26 +115,53 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}${isWelcome ? ' welcome-message' : ''}`;
     messageDiv.id = `message-${messageId}`;
-    
+
     // Convert markdown to HTML for assistant messages
     const displayContent = type === 'assistant' ? marked.parse(content) : escapeHtml(content);
-    
-    let html = `<div class="message-content">${displayContent}</div>`;
-    
+
+    messageDiv.innerHTML = `<div class="message-content">${displayContent}</div>`;
+
     if (sources && sources.length > 0) {
-        html += `
-            <details class="sources-collapsible">
-                <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
-            </details>
-        `;
+        messageDiv.appendChild(buildSourcesElement(sources));
     }
-    
-    messageDiv.innerHTML = html;
+
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    
+
     return messageId;
+}
+
+// Build the collapsible "Sources" section, rendering each source as a link when available
+function buildSourcesElement(sources) {
+    const details = document.createElement('details');
+    details.className = 'sources-collapsible';
+
+    const summary = document.createElement('summary');
+    summary.className = 'sources-header';
+    summary.textContent = 'Sources';
+    details.appendChild(summary);
+
+    const content = document.createElement('div');
+    content.className = 'sources-content';
+
+    sources.forEach((source, index) => {
+        if (index > 0) {
+            content.appendChild(document.createTextNode(', '));
+        }
+        if (source.link) {
+            const anchor = document.createElement('a');
+            anchor.href = source.link;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            anchor.textContent = source.text;
+            content.appendChild(anchor);
+        } else {
+            content.appendChild(document.createTextNode(source.text));
+        }
+    });
+
+    details.appendChild(content);
+    return details;
 }
 
 // Helper function to escape HTML for user messages
@@ -158,15 +185,15 @@ async function loadCourseStats() {
         console.log('Loading course stats...');
         const response = await fetch(`${API_URL}/courses`);
         if (!response.ok) throw new Error('Failed to load course stats');
-        
+
         const data = await response.json();
         console.log('Course data received:', data);
-        
+
         // Update stats in UI
         if (totalCourses) {
             totalCourses.textContent = data.total_courses;
         }
-        
+
         // Update course titles
         if (courseTitles) {
             if (data.course_titles && data.course_titles.length > 0) {
@@ -177,7 +204,7 @@ async function loadCourseStats() {
                 courseTitles.innerHTML = '<span class="no-courses">No courses available</span>';
             }
         }
-        
+
     } catch (error) {
         console.error('Error loading course stats:', error);
         // Set default values on error
