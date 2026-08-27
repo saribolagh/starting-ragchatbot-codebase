@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Query trace — Course Materials RAG System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --note-bg:        #f2f1ec;
+
+    --c1: #2a78d6; /* Browser   - blue    */
+    --c2: #eb6834; /* FastAPI   - orange  */
+    --c3: #1baf7a; /* RAG Sys.  - aqua    */
+    --c4: #eda100; /* AI Gen.   - yellow  */
+    --c5: #e87ba4; /* Claude API- magenta */
+    --c6: #008300; /* Search T. - green   */
+    --c7: #4a3aa7; /* Vector St.- violet  */
+
+    --amber: #fab219;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --note-bg:        #232320;
+
+      --c1: #3987e5;
+      --c2: #d95926;
+      --c3: #199e70;
+      --c4: #c98500;
+      --c5: #d55181;
+      --c6: #008300;
+      --c7: #9085e9;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --note-bg:        #232320;
+
+    --c1: #3987e5;
+    --c2: #d95926;
+    --c3: #199e70;
+    --c4: #c98500;
+    --c5: #d55181;
+    --c6: #008300;
+    --c7: #9085e9;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--page);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+  }
+  .wrap { max-width: 1760px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  .top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--text-secondary); font-size: 13.5px; max-width: 66ch; line-height: 1.5; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button.ctrl {
+    font: inherit; font-size: 12.5px; cursor: pointer;
+    padding: 7px 12px; border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-primary);
+  }
+  button.ctrl[aria-pressed="true"] { border-color: var(--c1); box-shadow: inset 0 0 0 1px var(--c1); }
+  button.ctrl:hover { filter: brightness(1.05); }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 14px 20px;
+    font-size: 12px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 18px;
+  }
+  .legend .item { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .legend .swatch-line { width: 22px; height: 0; border-top: 2px solid var(--text-muted); display: inline-block; }
+  .legend .swatch-line.dashed { border-top-style: dashed; }
+  .legend .pill {
+    font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+    background: rgba(250,178,25,0.18); color: var(--text-primary);
+    border: 1px solid var(--amber);
+  }
+
+  .scroller { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
+  .diagram { position: relative; min-width: 1600px; padding: 0 18px 18px; }
+
+  .headers {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    position: sticky; top: 0; z-index: 3;
+    background: var(--surface-1);
+    padding-top: 16px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  .col-head { padding: 0 8px 12px; text-align: center; }
+  .col-chip {
+    width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+    margin-bottom: 6px;
+  }
+  .col-name { font-size: 13.5px; font-weight: 600; }
+  .col-file { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 2px; }
+
+  .lanes { position: relative; }
+  .lifeline {
+    position: absolute; top: 0; width: 0;
+    border-left: 2px dashed var(--gridline);
+  }
+
+  .steps { position: relative; padding-top: 22px; }
+  .row { position: relative; }
+
+  .arrow-line {
+    position: absolute; height: 2px;
+  }
+  .arrow-line.solid { }
+  .arrow-line.dashed {
+    background: none !important;
+    border-top: 2px dashed;
+  }
+  .arrowhead {
+    position: absolute; width: 0; height: 0;
+    border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+  }
+  .arrowhead.right { border-left: 9px solid; }
+  .arrowhead.left  { border-right: 9px solid; }
+
+  .step-label {
+    position: absolute; transform: translateX(-50%);
+    text-align: center; font-size: 12.2px; color: var(--text-secondary);
+    line-height: 1.35; pointer-events: none;
+  }
+  .step-label b { color: var(--text-primary); font-weight: 600; }
+  .step-label code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.3px; background: rgba(120,120,120,0.12); padding: 0 3px; border-radius: 3px;
+  }
+
+  .badge {
+    position: absolute;
+    width: 20px; height: 20px; border-radius: 999px;
+    background: var(--surface-1); border: 1.5px solid var(--text-muted);
+    color: var(--text-primary); font-size: 10.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2; cursor: help;
+  }
+  .badge.tool { border-color: var(--amber); }
+
+  .note {
+    position: absolute; transform: translateX(-50%);
+    max-width: 240px; padding: 7px 10px; border-radius: 8px;
+    background: var(--note-bg); border: 1px dashed var(--text-muted);
+    font-size: 11.6px; color: var(--text-secondary); text-align: left;
+  }
+  .note .ref { display:block; margin-top:4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.6px; color: var(--text-muted); }
+
+  .tooltip {
+    position: absolute; z-index: 10; max-width: 320px;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; line-height: 1.45; padding: 9px 11px; border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    opacity: 0; pointer-events: none; transform: translate(-50%, 6px);
+    transition: opacity 120ms ease;
+  }
+  .tooltip .ref { display:block; margin-top:5px; opacity:.75; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  .hoverable:hover .tooltip, .hoverable:focus-within .tooltip { opacity: 1; }
+
+  .dimmed { opacity: 0.28; filter: grayscale(0.6); transition: opacity 160ms ease, filter 160ms ease; }
+  .skip-banner {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    background: var(--amber); color: #1a1a19; font-size: 11.5px; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    display: none; z-index: 4;
+  }
+  .show-skip .skip-banner { display: block; }
+
+  table.trace-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.trace-table th, table.trace-table td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--gridline);
+    vertical-align: top;
+  }
+  table.trace-table th { color: var(--text-muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .02em; }
+  table.trace-table td.ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+  table.trace-table td.step-n { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+  .who { display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+  .who .dot { width:9px; height:9px; border-radius:999px; }
+  .branch-tag {
+    font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+    background: rgba(250,178,25,0.18); border: 1px solid var(--amber); margin-left: 6px;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  footer.note-foot { margin-top: 16px; font-size: 11.5px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="viz-root wrap">
+
+  <div class="top">
+    <div>
+      <h1>How a chat query flows through the RAG system</h1>
+      <div class="sub">Sequence trace from the browser's fetch call through FastAPI, the RAG orchestrator, Claude's tool-calling loop, and ChromaDB — for a single <code>POST /api/query</code> request.</div>
+    </div>
+    <div class="controls">
+      <button class="ctrl" id="btnTheme" aria-pressed="false">🌗 Toggle dark mode</button>
+      <button class="ctrl" id="btnSkip" aria-pressed="false">💡 Highlight general-knowledge shortcut</button>
+      <button class="ctrl" id="btnView" aria-pressed="false">📋 Table view</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="swatch-line"></span> request (call)</div>
+    <div class="item"><span class="swatch-line dashed"></span> response (return value)</div>
+    <div class="item"><span class="pill">conditional</span> only happens when Claude decides a search is needed</div>
+    <div class="item">Colored square = originating component (see column headers)</div>
+  </div>
+
+  <div id="diagramView" class="view active">
+    <div class="scroller">
+      <div class="diagram" id="diagram">
+        <div class="headers" id="headers"></div>
+        <div class="lanes">
+          <div id="lifelines"></div>
+          <div class="steps" id="steps"></div>
+        </div>
+      </div>
+    </div>
+    <footer class="note-foot">Hover any step number for the code reference. Scroll horizontally on small screens.</footer>
+  </div>
+
+  <div id="tableView" class="view">
+    <table class="trace-table">
+      <thead><tr><th>#</th><th>From → To</th><th>Action</th><th>Code</th></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const COLUMNS = [
+  { key:'browser', name:'Browser',      file:'frontend/script.js',        color:'--c1' },
+  { key:'fastapi', name:'FastAPI',      file:'backend/app.py',            color:'--c2' },
+  { key:'rag',     name:'RAG System',   file:'backend/rag_system.py',     color:'--c3' },
+  { key:'aigen',   name:'AI Generator', file:'backend/ai_generator.py',   color:'--c4' },
+  { key:'claude',  name:'Claude API',   file:'Anthropic (external)',      color:'--c5' },
+  { key:'tool',    name:'Search Tool',  file:'backend/search_tools.py',   color:'--c6' },
+  { key:'vstore',  name:'Vector Store', file:'backend/vector_store.py',   color:'--c7' },
+];
+const COL_INDEX = Object.fromEntries(COLUMNS.map((c,i)=>[c.key,i]));
+const N = COLUMNS.length;
+const colCenter = i => ((i + 0.5) / N) * 100;
+
+// type: 'call' (solid, request) | 'return' (dashed, response) | 'note' (self/internal)
+const STEPS = [
+  { n:1,  type:'call',   from:'browser', to:'fastapi',
+    label:'<b>POST /api/query</b>  { query, session_id }',
+    ref:'script.js:63–72 → app.py:56', branch:'always',
+    detail:'sendMessage() disables the input, appends the user bubble, and fetches the backend with the current session_id (null on first message).' },
+
+  { n:2,  type:'note', col:'fastapi',
+    label:'if session_id is missing → session_manager.create_session()',
+    ref:'app.py:61–63', branch:'always',
+    detail:'Each browser tab that hasn’t sent a query yet gets a fresh UUID session so history can be tracked.' },
+
+  { n:3,  type:'call', from:'fastapi', to:'rag',
+    label:'<code>rag_system.query(query, session_id)</code>',
+    ref:'app.py:66', branch:'always',
+    detail:'The endpoint hands off to the RAGSystem orchestrator and wraps the call in a try/except → HTTP 500.' },
+
+  { n:4,  type:'note', col:'rag',
+    label:'session_manager.get_conversation_history(session_id)',
+    ref:'rag_system.py:117–119', branch:'always',
+    detail:'Returns the last MAX_HISTORY=2 exchanges as a formatted string, or None for a brand new session.' },
+
+  { n:5,  type:'call', from:'rag', to:'aigen',
+    label:'<code>generate_response(prompt, history, tools, tool_manager)</code>',
+    ref:'rag_system.py:122–127', branch:'always',
+    detail:'Passes the wrapped query, prior history, the search tool’s Anthropic tool schema, and the ToolManager itself so tool calls can be executed inline.' },
+
+  { n:6,  type:'call', from:'aigen', to:'claude',
+    label:'<code>messages.create(tools=[search_course_content], tool_choice=\'auto\')</code>',
+    ref:'ai_generator.py:80', branch:'always',
+    detail:'First Claude call. System prompt tells Claude: search only for course-specific questions, answer general-knowledge questions directly, one search maximum.' },
+
+  { n:7,  type:'return', from:'claude', to:'aigen',
+    label:'<code>stop_reason == \'tool_use\'</code>  — Claude asks to search course content',
+    ref:'ai_generator.py:83', branch:'tool',
+    detail:'Only happens when Claude judges the question needs specific course material. For general-knowledge questions Claude instead returns final text directly here — the rest of this branch is skipped.' },
+
+  { n:8,  type:'call', from:'aigen', to:'tool',
+    label:'<code>tool_manager.execute_tool(\'search_course_content\', query, course_name?, lesson_number?)</code>',
+    ref:'ai_generator.py:111–114 → search_tools.py:135–140', branch:'tool',
+    detail:'Every tool_use block Claude returned is executed and its result collected for a single follow-up message.' },
+
+  { n:9,  type:'call', from:'tool', to:'vstore',
+    label:'<code>vector_store.search(query, course_name, lesson_number)</code>',
+    ref:'search_tools.py:66–70', branch:'tool',
+    detail:'CourseSearchTool delegates straight to the vector store’s unified search interface.' },
+
+  { n:'9b', type:'note', col:'vstore',
+    label:'resolve course_name via course_catalog (semantic match) → build $and filter → query course_content',
+    ref:'vector_store.py:78–100', branch:'tool',
+    detail:'A fuzzy course title (e.g. "MCP") is first resolved against the course_catalog collection, then combined with an optional lesson_number into a Chroma "where" filter for the content query.' },
+
+  { n:10, type:'return', from:'vstore', to:'tool',
+    label:'<code>SearchResults(documents, metadata, distances)</code>',
+    ref:'vector_store.py:98', branch:'tool',
+    detail:'Or an empty/error result if nothing matched the filter.' },
+
+  { n:11, type:'return', from:'tool', to:'aigen',
+    label:'formatted context string  <span class="ref-inline">(sources cached in last_sources)</span>',
+    ref:'search_tools.py:88–114', branch:'tool',
+    detail:'Results are formatted as "[Course - Lesson N]\\n<chunk>" blocks; the plain course/lesson labels are stashed on the tool instance for the UI’s Sources panel.' },
+
+  { n:12, type:'call', from:'aigen', to:'claude',
+    label:'<code>messages.create(...)</code>  — tool_result appended, no tools this round',
+    ref:'ai_generator.py:126–134', branch:'tool',
+    detail:'Second Claude call with the tool_use + tool_result messages appended; tools are omitted so Claude must answer now (system prompt also caps this at one search).' },
+
+  { n:13, type:'return', from:'claude', to:'aigen',
+    label:'final answer text',
+    ref:'ai_generator.py:134–135', branch:'always',
+    detail:'For a general-knowledge question this is the same response object returned back at step 7 — no second round trip happens.' },
+
+  { n:14, type:'return', from:'aigen', to:'rag',
+    label:'response text',
+    ref:'rag_system.py:122 (return value)', branch:'always' },
+
+  { n:15, type:'note', col:'rag',
+    label:'tool_manager.get_last_sources() / reset_sources() · session_manager.add_exchange(query, response)',
+    ref:'rag_system.py:130–137', branch:'always',
+    detail:'Sources are read once then cleared so they don’t leak into the next query; the exchange is appended to this session’s rolling history.' },
+
+  { n:16, type:'return', from:'rag', to:'fastapi',
+    label:'<code>(response, sources)</code>',
+    ref:'rag_system.py:140', branch:'always' },
+
+  { n:17, type:'return', from:'fastapi', to:'browser',
+    label:'200 OK  { answer, sources, session_id }',
+    ref:'app.py:68–72', branch:'always' },
+
+  { n:18, type:'note', col:'browser',
+    label:'marked.parse(answer) → render message + collapsible Sources; re-enable input',
+    ref:'script.js:83–95', branch:'always',
+    detail:'Loading indicator is removed, the session_id is stored for the next turn, and the input/send button are re-enabled.' },
+];
+
+function colorVar(key){ return `var(${COLUMNS[COL_INDEX[key]].color})`; }
+
+// ---------- render headers + lifelines ----------
+const headers = document.getElementById('headers');
+COLUMNS.forEach(c=>{
+  const el = document.createElement('div');
+  el.className = 'col-head';
+  el.innerHTML = `<span class="col-chip" style="background:var(${c.color})"></span>
+    <div class="col-name">${c.name}</div>
+    <div class="col-file">${c.file}</div>`;
+  headers.appendChild(el);
+});
+
+const lifelinesEl = document.getElementById('lifelines');
+COLUMNS.forEach((c,i)=>{
+  const el = document.createElement('div');
+  el.className = 'lifeline';
+  el.style.left = colCenter(i) + '%';
+  lifelinesEl.appendChild(el);
+});
+
+// ---------- render steps ----------
+const stepsEl = document.getElementById('steps');
+
+const ROW_GAP = 14;      // breathing room below each row's content
+const BADGE_D = 20;       // badge diameter
+const TRACK_GAP = 8;      // gap between wrapped label text and its arrow line
+
+STEPS.forEach(s=>{
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.dataset.branch = s.branch;
+  // rows are appended to a DOM that's already in the page, so offsetHeight
+  // reads real rendered (wrapped) text height even though children are absolute.
+
+  if(s.type === 'note'){
+    const ci = COL_INDEX[s.col];
+    const cx = colCenter(ci);
+
+    const badge = document.createElement('div');
+    badge.className = 'badge hoverable' + (s.branch==='tool' ? ' tool' : '');
+    badge.style.left = cx + '%';
+    badge.style.top = '0px';
+    badge.style.transform = 'translateX(-50%)';
+    badge.innerHTML = `${s.n}<div class="tooltip" style="left:0;top:${BADGE_D+6}px;">${s.detail || ''}<span class="ref">${s.ref}</span></div>`;
+    row.appendChild(badge);
+
+    const note = document.createElement('div');
+    note.className = 'note';
+    note.style.left = cx + '%';
+    note.style.top = (BADGE_D + 8) + 'px';
+    note.innerHTML = `${s.label}<span class="ref">${s.ref}</span>`;
+    row.appendChild(note);
+
+    stepsEl.appendChild(row);
+    const noteBottom = (BADGE_D + 8) + note.getBoundingClientRect().height;
+    row.style.height = (noteBottom + ROW_GAP) + 'px';
+
+  } else {
+    const fi = COL_INDEX[s.from], ti = COL_INDEX[s.to];
+    const x1 = colCenter(fi), x2 = colCenter(ti);
+    const left = Math.min(x1,x2), width = Math.abs(x2-x1);
+    const goingRight = x2 > x1;
+    const srcColor = colorVar(s.from);
+    const mid = (x1+x2)/2;
+
+    const label = document.createElement('div');
+    label.className = 'step-label';
+    label.style.left = mid + '%';
+    label.style.width = Math.max(width, 20) + '%';
+    label.style.top = '0px';
+    label.innerHTML = s.label;
+    row.appendChild(label);
+
+    stepsEl.appendChild(row);
+    const labelH = label.getBoundingClientRect().height;
+    const trackTop = labelH + TRACK_GAP;
+
+    const line = document.createElement('div');
+    line.className = 'arrow-line ' + (s.type === 'return' ? 'dashed' : 'solid');
+    line.style.left = left + '%';
+    line.style.width = width + '%';
+    line.style.top = trackTop + 'px';
+    if(s.type === 'return'){ line.style.borderColor = srcColor; }
+    else { line.style.background = srcColor; }
+    row.appendChild(line);
+
+    const head = document.createElement('div');
+    head.className = 'arrowhead ' + (goingRight ? 'right' : 'left');
+    head.style.left = (goingRight ? (left+width) : left) + '%';
+    head.style.top = (trackTop - 5) + 'px';
+    head.style.borderLeftColor = goingRight ? srcColor : 'transparent';
+    head.style.borderRightColor = goingRight ? 'transparent' : srcColor;
+    head.style.transform = 'translateX(' + (goingRight ? '0' : '-100%') + ')';
+    row.appendChild(head);
+
+    const badge = document.createElement('div');
+    badge.className = 'badge hoverable' + (s.branch==='tool' ? ' tool' : '');
+    badge.style.left = x1 + '%';
+    badge.style.top = (trackTop - BADGE_D/2 + 1) + 'px';
+    badge.style.transform = 'translateX(-50%)';
+    badge.innerHTML = `${s.n}<div class="tooltip" style="left:0;top:${BADGE_D+6}px;">${s.detail || s.label.replace(/<[^>]+>/g,'')}<span class="ref">${s.ref}</span></div>`;
+    row.appendChild(badge);
+
+    row.style.height = (trackTop + BADGE_D/2 + ROW_GAP) + 'px';
+  }
+});
+
+// skip banner overlay for the tool branch (steps 7 → 12)
+(function addSkipBanner(){
+  const rows = Array.from(stepsEl.children);
+  const toolRows = rows.filter(r => r.dataset.branch === 'tool');
+  if(!toolRows.length) return;
+  const first = toolRows[0], last = toolRows[toolRows.length-1];
+  const banner = document.createElement('div');
+  banner.className = 'skip-banner';
+  banner.style.left = colCenter(COL_INDEX['tool']) + '%';
+  banner.textContent = 'skipped — Claude answers from its own knowledge';
+  const wrapperTop = first.offsetTop || 0;
+  banner.style.top = (first.offsetTop + 4) + 'px';
+  banner.style.position = 'absolute';
+  stepsEl.appendChild(banner);
+})();
+
+// ---------- lifeline height ----------
+function fitLifelines(){
+  const h = stepsEl.getBoundingClientRect().height + document.getElementById('headers').getBoundingClientRect().height;
+  const stepsH = stepsEl.getBoundingClientRect().height;
+  document.querySelectorAll('.lifeline').forEach(l=> l.style.height = stepsH + 'px');
+}
+window.addEventListener('load', fitLifelines);
+window.addEventListener('resize', fitLifelines);
+setTimeout(fitLifelines, 0);
+
+// ---------- controls ----------
+const root = document.documentElement;
+document.getElementById('btnTheme').addEventListener('click', (e)=>{
+  const isDark = root.getAttribute('data-theme') === 'dark';
+  root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  e.currentTarget.setAttribute('aria-pressed', String(!isDark));
+});
+
+document.getElementById('btnSkip').addEventListener('click', (e)=>{
+  const active = e.currentTarget.getAttribute('aria-pressed') === 'true';
+  e.currentTarget.setAttribute('aria-pressed', String(!active));
+  document.getElementById('diagram').classList.toggle('show-skip', !active);
+  document.querySelectorAll('#steps > .row').forEach(r=>{
+    r.classList.toggle('dimmed', !active && r.dataset.branch === 'tool');
+  });
+});
+
+document.getElementById('btnView').addEventListener('click', (e)=>{
+  const toTable = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+  e.currentTarget.setAttribute('aria-pressed', String(toTable));
+  document.getElementById('diagramView').classList.toggle('active', !toTable);
+  document.getElementById('tableView').classList.toggle('active', toTable);
+  e.currentTarget.textContent = toTable ? '📈 Diagram view' : '📋 Table view';
+});
+
+// ---------- table view ----------
+const tbody = document.getElementById('tableBody');
+STEPS.forEach(s=>{
+  const tr = document.createElement('tr');
+  const fromCol = s.type === 'note' ? COLUMNS[COL_INDEX[s.col]] : COLUMNS[COL_INDEX[s.from]];
+  const toCol   = s.type === 'note' ? fromCol : COLUMNS[COL_INDEX[s.to]];
+  const arrow = s.type === 'note' ? '↻ (internal)' : (s.type === 'return' ? '⤺ returns to' : '→');
+  tr.innerHTML = `
+    <td class="step-n">${s.n}</td>
+    <td><span class="who"><span class="dot" style="background:var(${fromCol.color})"></span>${fromCol.name}</span> ${arrow} ${s.type==='note'?'':`<span class="who"><span class="dot" style="background:var(${toCol.color})"></span>${toCol.name}</span>`}</td>
+    <td>${s.label.replace(/<[^>]+>/g,'')}${s.branch==='tool' ? '<span class="branch-tag">conditional</span>' : ''}</td>
+    <td class="ref">${s.ref}</td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>
