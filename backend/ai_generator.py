@@ -34,9 +34,12 @@ Provide only the direct answer to what was asked.
         self.model = model
 
         # Pre-build base API parameters
+        # Extended thinking is disabled: this backend auto-enables it otherwise,
+        # which produces an empty final text block after tool execution.
         self.base_params = {
             "model": self.model,
-            "max_tokens": 800
+            "max_tokens": 800,
+            "thinking": {"type": "disabled"}
         }
 
     def generate_response(self, query: str,

@@ -246,12 +246,12 @@ header h1 {
 }
 
 .sources-content a {
-    color: var(--primary-color);
-    text-decoration: none;
+    color: #93c5fd;
+    text-decoration: underline;
 }
 
 .sources-content a:hover {
-    text-decoration: underline;
+    color: #bfdbfe;
 }
 
 /* Markdown formatting styles */
@@ -498,6 +498,28 @@ header h1 {
 details[open] .stats-header::before,
 details[open] .suggested-header::before {
     transform: rotate(90deg);
+}
+
+.new-chat-button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    border: none;
+    background: none;
+    outline: none;
+    transition: color 0.2s ease;
+}
+
+.new-chat-button:hover,
+.new-chat-button:focus {
+    color: var(--primary-color);
 }
 
 /* Course Stats in Sidebar */
